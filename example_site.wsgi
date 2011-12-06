@@ -2,7 +2,7 @@ import os
 import sys
 import site
 
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), 'firehaz')
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), 'example_site')
 SITE_PACKAGES = os.path.join(os.path.dirname(PROJECT_ROOT), 'env/lib/python2.7/site-packages')
 site.addsitedir(os.path.abspath(SITE_PACKAGES))
 
