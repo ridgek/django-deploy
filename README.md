@@ -4,7 +4,6 @@ django-deploy
 Template for deploying [Django](http://www.djangoproject.com)
 projects using [Fabric](http://fabfile.org).
 
-------------
 
 Requirements
 ------------
@@ -21,13 +20,20 @@ Requirements
 
 * apt
 
+* sshd
+
 * python => 2.6 (edit site-dir in `example_site.wsgi`)
 
 * virtualenv
 
 * pip
 
---------------
+
+Configuration
+-------------
+
+Configuration of deployment is done by changing values in `fabfile.py`
+
 
 Project Layout
 --------------
@@ -42,7 +48,6 @@ A basic directory structure is assumed
         example_site.wsgi  -- mod_wsgi configuration
         fabfile.py
 
------
 
 Usage
 -----
