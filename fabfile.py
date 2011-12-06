@@ -3,6 +3,14 @@ import os
 from fabric.api import env, run, cd, sudo, require, settings
 from fabric.contrib import files
 
+# Production hosts
+# Example: ["p1.example.com", "p2.example.com"]
+PRODUCTION_HOSTS = []
+
+# Staging hosts
+# Example: ["s1.example.com", "s2.example.com"]
+STAGING_HOSTS = []
+
 # Name of the django-project
 # Example: "example_site"
 env.project = ""
@@ -46,13 +54,25 @@ env.packages = ("git", "python-dev", "python-setuptools",
         "apache2", "libapache2-mod-wsgi",
         "libsqlite3-0", "python-virtualenv",)
 
+def production():
+    """
+    Target production host(s)
+    """
+    env.hosts = PRODUCTION_HOSTS
+
+def staging():
+    """
+    Target staging host(s)
+    """
+    env.hosts = STAGING_HOSTS
+
 def deploy():
     """
     Deploy onto host(s)
     Hosts can be virgin or already deployed
     """
     #Install packages
-    if env.packages not None:
+    if not env.packages == None:
         sudo("apt-get update -q")
         sudo("apt-get install -q -y --no-upgrade %s" % " ".join(env.packages))
         

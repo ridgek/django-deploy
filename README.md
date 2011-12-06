@@ -52,6 +52,16 @@ A basic directory structure is assumed
 Usage
 -----
 
+`fab TARGET COMMAND...`
+
+#### Targets
+
+* `production` - Target production host(s)
+
+* `staging` - Target staging host(s)
+
+#### Commands
+
 * `deploy` - Deploy the host (apt-get, virtualenv, git clone)
 
 * `pull` - git pull
