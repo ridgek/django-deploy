@@ -1,77 +1,50 @@
 django-deploy
 =================
 
-Template for deploying [Django](http://www.djangoproject.com)
-projects using [Fabric](http://fabfile.org).
+Template for deploying [Django](http://www.djangoproject.com) projects
+to [Debian Wheezy](http://debian.org) hosts,
+using [Fabric](http://fabfile.org)
+and [Git](http://git-scm.com).
+
+The template assumes a deployment of [Gunicorn](http://gunicorn.org)
+running behind [Nginx](http://wiki.nginx.org).
+
+No database deployment is currently implemented.
 
 
 Requirements
 ------------
 
-#### Local
+#### Local ####
 
-* python => 2.6
-
-* setuptools
-
-* fabric => 1.3.2
-
-#### Remote 
-
-* apt
-
-* sshd
-
-* python => 2.6 (edit site-dir in `example_site.wsgi`)
+* python >= 2.6
 
 * virtualenv
 
-* pip
+* setuptools
 
+* fabric >= 1.3.2
 
-Configuration
--------------
+#### Remote ####
 
-Configuration of deployment is done by changing values in `fabfile.py`
+* Debian Wheezy or newer
+
+* SSH access
 
 
 Project Layout
 --------------
 
-A basic directory structure is assumed
+A basic directory structure is assumed.
 
-    django_deploy/         -- This should be the root of a git repository
-        apache/
-            apache2.conf   -- Apache2 config file
-        env/               -- Python virtualenv 
-        example_site/      -- Django project
-        example_site.wsgi  -- mod_wsgi configuration
+    django_deploy/
+        nginx/
+            nginx.conf       -- Nginx config file
+        gunicorn/
+            gunicorn-default -- for /etc/default/gunicorn
+            djangotest.py    -- Gunicorn config file
+        env/                 -- Python virtualenv 
+        djangotest/          -- Django project
         fabfile.py
+        requirements.txt     -- Pip requirements file
 
-
-Usage
------
-
-`fab TARGET COMMAND...`
-
-#### Targets
-
-* `production` - Target production host(s)
-
-* `staging` - Target staging host(s)
-
-#### Commands
-
-* `deploy` - Deploy the host (apt-get, virtualenv, git clone)
-
-* `pull` - git pull
-
-* `reset:HASH` - git reset (`reset:4jg6` is equivalent to `git reset 4jq6`)
-
-* `update_requirements` - Use PIP to update the virtualenv requirements
-
-* `restart` - Restart apache2 (`apapche2ctl restart`)
-
-* `collect_static` - Collect Django static files (`manage.py collectstatic`)
-
-* `clean` - Clean (undeploy) the host

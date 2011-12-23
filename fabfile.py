@@ -1,147 +1,174 @@
 import os
+import sys
 
-from fabric.api import env, run, cd, sudo, require, settings
+from fabric.api import env, run, cd, sudo, get, settings, local
 from fabric.contrib import files
+from fabric.colors import red
 
-# Production hosts
-# Example: ["p1.example.com", "p2.example.com"]
-PRODUCTION_HOSTS = []
+env.hosts = ['example.com']
 
-# Staging hosts
-# Example: ["s1.example.com", "s2.example.com"]
-STAGING_HOSTS = []
+# User to use on remote host
+# Edit gunicorn config file to reflect this change
+env.user = 'example_user'
 
-# Name of the django-project
-# Example: "example_site"
-env.project = ""
+# Django project name (same as directory name)
+env.project = 'djangotest'
 
-# User to use on remote hosts
-# This user should have write permission for root directory
-# Example: "example_user"
-env.user = ""
+# Path to the root of the installation (where to clone to)
+# Edit gunicorn and nginx config files to reflect this change
+env.root = '/home/example_user/django-deploy'
 
-# Root for deployment
-# Example: "/home/example_user/django-deploy"
-env.root = ""
+# Path to the project root
+env.project_root = os.path.abspath(os.path.join(env.root, env.project))
+# Path to the virtualenv root 
+env.env_root = os.path.abspath(os.path.join(env.root, 'env'))
+# Path to the pip requirements file
+env.requirements = os.path.abspath(os.path.join(env.root, 'requirements.txt'))
 
-# Django Project root
-# Example: "/home/example_user/django-deploy/example_site"
-env.project_root = os.path.join(env.root, env.project)
+# Git repository to use
+env.git_repo = 'git://github.com/ridgek/django-deploy.git'
+env.git_branch = 'master'
 
-# Python virtualenv root
-# Example: "/home/example_user/django-deploy/env"
-env.env_root = os.path.join(env.root, "env")
+# Location of gunicorn config file
+env.gunicorn_config = os.path.abspath(os.path.join(env.root, 'gunicorn', 'djangotest.py'))
+# Location of gunicorn default file (for /etc/default/gunicorn)
+env.gunicorn_default = os.path.abspath(os.path.join(env.root, 'gunicorn', 'gunicorn-default'))
+# Location of nginx config file
+env.nginx_config = os.path.abspath(os.path.join(env.root, 'nginx', 'nginx.conf'))
 
-# pip requirements file location
-# Example: "/home/example_user/django-deploy/env"
-env.requirements = os.path.join(env.root, "requirements.txt")
 
-# Apache config root
-# Example: "/home/example_user/django-deploy/apache"
-env.apache_config_root = os.path.join(env.root, "apache")
+env.apt_packages = [
+	'git',
+	'python-setuptools',
+	'python-virtualenv',
+	'build-essential',
+	
+	'gunicorn',
+	'nginx-full',
 
-# Git repository URI
-# Example: "git://github.com/example_user/example_site.git"
-env.repo = ""
+	'libsqlite3-0',
+]
 
-# Git repository branch
-# Example: "master"
-env.branch = "master"
-
-# Packages to apt-get install
-# Example: ("vrms", "apache2", "python-dev")
-env.packages = ("git", "python-dev", "python-setuptools",
-        "apache2", "libapache2-mod-wsgi",
-        "libsqlite3-0", "python-virtualenv",)
-
-def production():
-    """
-    Target production host(s)
-    """
-    env.hosts = PRODUCTION_HOSTS
-
-def staging():
-    """
-    Target staging host(s)
-    """
-    env.hosts = STAGING_HOSTS
+def deploy_local():
+	"""Set up local virtualenv"""
+	local('mkdir -p %s' % os.path.split(env.env_root)[1])
+	local('virtualenv --no-site-packages %s' % os.path.split(env.env_root)[1])
+	local('. %s/bin/activate; pip install -E %s -r %s' % 
+		(os.path.split(env.env_root)[1],
+		os.path.split(env.env_root)[1],
+		os.path.split(env.requirements)[1]))
 
 def deploy():
-    """
-    Deploy onto host(s)
-    Hosts can be virgin or already deployed
-    """
-    #Install packages
-    if not env.packages == None:
-        sudo("apt-get update -q")
-        sudo("apt-get install -q -y --no-upgrade %s" % " ".join(env.packages))
-        
-    #Create root directory
-    run("mkdir -p %(root)s" % env)
+	"""Deploy to host(s)."""
+	run('mkdir -p %(root)s' % env)
+	update_packages()
+	configure_virtualenv()
+	configure_gunicorn()
+	configure_nginx()
+	syncdb()
+	collect_static()
+	restart()
 
-    #Clone into root directory (if .git does not exist)
-    with cd(env.root):
-        if not files.exists(os.path.join(env.root, ".git")):
-            run("git clone %(repo)s ." % env)
-            #Set git user (for messy merges)
-            run("git config user.name 'DeployServer'; git config user.email 'admin@firehaz.co.nz'")
-        pull()
+def configure_git():
+	"""Configure git repository.
+	
+	Defines user.name and user.email incase a merge happens.
+	
+	"""
+	with cd(env.root):
+		if not files.exists(os.path.abspath(os.path.join(env.root, '.git'))):
+			run('git clone %(git_repo)s .' % env)
+			run('git config user.name "No One"')
+			run('git config user.email none@none')
+		pull()
 
-    #Create virtualenv (if it does not already exist)
-    run("mkdir -p %(env_root)s" % env)
-    run("virtualenv %(env_root)s" % env)
-    
-    #Populate virtualenv
-    update_requirements()
+def configure_virtualenv():
+	"""Configure virtualenv."""
+	run('mkdir -p %(env_root)s' % env)
+	run('virtualenv --no-site-packages %(env_root)s' % env)
+	update_requirements()
 
-    #Configure apache
-    with cd("/etc/apache2"):
-        sudo("rm -rf apache2.conf conf.d/ httpd.conf magic mods-* sites-* ports.conf")
-        sudo("ln -s %(apache_config_root)s/apache2.conf ./apache2.conf" % env)
-        sudo("mkdir -m777 -p /var/www/.python-eggs")
-        restart()
+def configure_gunicorn():
+	"""Configure gunicorn.
+	
+	Move /etc/gunicorn.d to /etc/gunicorn to prevent RuntimeErrors,
+	see https://github.com/lamby/pkg-gunicorn/issues/8 for details.
+	
+	"""
+	with settings(warn_only=True):
+		sudo('rm /etc/default/gunicorn')
+		sudo('ln -s %(gunicorn_default)s /etc/default/gunicorn' % env)
+		sudo('mkdir -p /etc/gunicorn')
+		sudo('mv /etc/gunicorn.d/* /etc/gunicorn/')
+		sudo('rm -r /etc/gunicorn.d')
+		sudo('ln -s /etc/gunicorn /etc/gunicorn.d')
+		sudo('rm /etc/gunicorn.d/%(project)s' % env)
+		sudo('ln -s %(gunicorn_config)s /etc/gunicorn.d/%(project)s' % env)
+		
+def configure_nginx():
+	"""Configure nginx."""
+	with settings(warn_only=True):
+		sudo('cd /etc/nginx; rm -r nginx.conf sites-available/ sites-enabled/')
+		sudo('ln -s %(nginx_config)s /etc/nginx/nginx.conf' % env)
+
+def generate_key():
+	"""Generate a RSA key, and get the public key.
+	
+	Copys the public key into the directory of this file.
+	
+	"""
+	run('ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa')
+	get('~/.ssh/id_rsa.pub', '%(host)s.pub' % env)
 
 def pull():
-    """
-    Pull branch HEAD from git repo
-    """
-    with cd(env.root):
-        run("git reset --hard")
-        run("git pull origin %(branch)s" % env)
-        
+	"""Pull branch HEAD from git repo.
+	
+	Performs a `reset --hard` before the pull to prevent merges.
+	
+	"""
+	with cd(env.root):
+		run('git reset --hard')
+		run('git pull origin %(git_branch)s' % env)
+		
 def reset(hash):
-    """
-    Reset to specified revision from git repo
-    Usage:
-        reset:ha5h
-    """
-    with cd(env.root):
-        pull()
-        run("git reset --hard %s" % hash)
+	"""Reset to specified revision from git repo."""
+	with cd(env.root):
+		run('git reset --hard %s' % hash)
+
+def update_packages():
+	"""Update apt packages."""
+	if not env.apt_packages == None:
+		with settings(warn_only=True):
+			sudo('apt-get update -q')
+		sudo('apt-get install -q -y %s' % ' '.join(env.apt_packages))
 
 def update_requirements():
-    """
-    Update python packages using requirements.txt
-    """
-    run("pip install -E %(env_root)s -r %(requirements)s" % env)
-    
+	"""Update virtualenv packages using requirements.txt."""
+	run('. %(env_root)s/bin/activate; pip install -E %(env_root)s -r %(requirements)s' % env)
+	
 def collect_static():
-    """
-    Collect app static files into project static folder
-    """
-    with cd(env.project_root):
-        run("%(env_root)s/bin/python manage.py collectstatic -v0 --noinput" % env)
-        
+	"""Collect app static files into project static folder."""
+	if files.exists('%(env_root)s/bin/python' % env):
+		with cd(env.project_root):
+			run('%(env_root)s/bin/python manage.py collectstatic -v0 --noinput' % env)
+	else:
+		print(red('collect_static failed: env does not exist'))
+		
+def syncdb():
+	"""Run django syncdb."""
+	if files.exists('%(env_root)s/bin/python' % env):
+		with cd(env.project_root):
+			run('%(env_root)s/bin/python manage.py syncdb' % env)
+	else:
+		print(red('syncdb failed: env does not exist'))
+	
+def reload():
+	"""Reload gunicorn and nginx."""
+	sudo('/etc/init.d/gunicorn reload')
+	sudo('/etc/init.d/nginx reload')
+
 def restart():
-    """
-    Restart apache
-    """
-    sudo("apache2ctl restart")
-    
-def clean():
-    """
-    Destroy everything
-    """
-    sudo("rm -rf $(root)s" % env)
-    sudo("apache2ctl stop")
-    
+	"""Restart gunicorn and nginx."""
+	sudo('/etc/init.d/gunicorn restart')
+	sudo('/etc/init.d/nginx restart')
+
