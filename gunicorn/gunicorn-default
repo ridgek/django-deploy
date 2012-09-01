@@ -1,5 +1,0 @@
-# /etc/default/gunicorn
-# Change confdir from /etc/gunicorn.d to /etc/gunicorn
-# to avoid RuntimeWarnings about absolute imports
-
-CONF_DIR=/etc/gunicorn

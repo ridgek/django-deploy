@@ -1,50 +1,45 @@
 django-deploy
 =================
 
-Template for deploying [Django](http://www.djangoproject.com) projects
-to [Debian Wheezy](http://debian.org) hosts,
-using [Fabric](http://fabfile.org)
-and [Git](http://git-scm.com).
+Template for [Django](http://www.djangoproject.com) projects,
+targetting [Debian](http://debian.org) hosts.
 
-The template assumes a deployment of [Gunicorn](http://gunicorn.org)
-running behind [Nginx](http://wiki.nginx.org).
+Assuming [virtualenv](http://virtualenv.org) environment with
+[Circus](http://circus.io) managing
+[Chaussette](http://chaussette.readthedocs.org) WSGI servers, running 
+[gevent](http://gevent.org/) workers.
 
-No database deployment is currently implemented.
-
-
-Requirements
-------------
-
-#### Local ####
-
-* python >= 2.6
-
-* virtualenv
-
-* setuptools
-
-* fabric >= 1.3.2
-
-#### Remote ####
-
-* Debian Wheezy or newer
-
-* SSH access
+Not necessarily limited to Django, should/will work with any WSGI application.
 
 
-Project Layout
---------------
+Usage
+-----
 
-A basic directory structure is assumed.
+1.  Replace `project/` and `manage.py` with your project
 
-    django_deploy/
-        nginx/
-            nginx.conf       -- Nginx config file
-        gunicorn/
-            gunicorn-default -- for /etc/default/gunicorn
-            djangotest.py    -- Gunicorn config file
-        env/                 -- Python virtualenv 
-        djangotest/          -- Django project
-        fabfile.py
-        requirements.txt     -- Pip requirements file
+2.  Edit `circus.ini` to point to your WSGI application ie. `project.wsgi.application`
 
+3.  Add python/pip dependencies to `requirements.txt`
+
+4.  Add dpkg dependencies to `packages.txt`
+
+5.  Build (set up virtualenv, install pip and dpkg requirements)
+        
+        $ ./build.sh build
+ 
+6.  Run
+
+        $ source venv/bin/activate
+        $ circusd circus.ini
+    
+7.  Clean up
+
+        $ ./build.sh clean
+
+Not Implemented
+---------------
+
+*   Provisioning the server
+*   Getting the code to the server, use Fabric and Git
+*   Support for non-apt distributions, just edit build.sh and packages.txt
+*   Serving static files, use S3 or nginx

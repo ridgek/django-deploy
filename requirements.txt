@@ -1,4 +1,6 @@
 Django
-GitPython==0.1.7
-django-assets
-yuicompressor
+circus
+chaussette
+gevent
+
+

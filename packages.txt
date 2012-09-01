@@ -1,0 +1,7 @@
+python-setuptools
+python-virtualenv
+python-dev
+build-essential
+libsqlite3-0
+libevent-dev
+zlib1g-dev
