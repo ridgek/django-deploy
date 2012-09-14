@@ -2,19 +2,13 @@
 
 usage()
 {
-cat << EOF
-
-Bootstrap
-
-$0 task
-
-Tasks:
-  build
-  clean
-EOF
+	echo "Usage: $0 {build|clean}"
 }
 
-ROOT=`pwd`
+# Die on error
+set -e
+
+ROOT=$(dirname "$0")
 VENV=$ROOT/venv
 DPKG_REQS=$ROOT/packages.txt
 PIP_REQS=$ROOT/requirements.txt

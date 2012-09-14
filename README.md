@@ -41,5 +41,5 @@ Not Implemented
 
 *   Provisioning the server
 *   Getting the code to the server, use Fabric and Git
-*   Support for non-apt distributions, just edit build.sh and packages.txt
+*   Support for non-apt distributions, just edit `build.sh` and `packages.txt`
 *   Serving static files, use S3 or nginx
